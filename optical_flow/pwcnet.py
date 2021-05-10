@@ -1,6 +1,9 @@
 "PWC network for optical flow prediction from https://github.com/NVlabs/PWC-Net/blob/master/PyTorch/models/PWCNet.py"
+#%%
 
+import cv2
 import torch
+import math
 import numpy as np
 import torch.nn as nn
 
@@ -166,9 +169,9 @@ class PWCNet(nn.Module):
         grid[:,1,:,:] = 2.0*grid[:,1,:,:].clone() / max(H-1,1)-1.0
 
         grid = grid.permute(0,2,3,1)
-        output = nn.functional.grid_sample(x, grid)
+        output = nn.functional.grid_sample(x, grid, align_corners=True)
         mask = torch.ones_like(x)
-        mask = nn.functional.grid_sample(mask, grid)
+        mask = nn.functional.grid_sample(mask, grid, align_corners=True)
 
         mask[mask < 0.9999] = 0
         mask[mask > 0] = 1
@@ -271,3 +274,49 @@ class PWCNet(nn.Module):
 
 if __name__ == "__main__":
     model = PWCNet()
+
+# %%
+def load_frames(path):
+    cap = cv2.VideoCapture(path)
+    video_length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) - 1
+
+    count = 0
+    frames = []
+
+    while cap.isOpened():
+        # Extract the frame
+        ret, frame = cap.read()
+        if not ret:
+            continue
+        # Write the results back to output location.
+        frames.append(frame)
+        count = count + 1
+        # If there are no more frames left
+        if (count > (video_length-1)):
+            cap.release()
+            break
+
+    return frames
+
+def resize_frames(frames, divisor=64):
+    H, W, _ = frames[0].shape
+    divisor = 64
+    H_ = int(math.ceil(H/divisor) * divisor)
+    W_ = int(math.ceil(W/divisor) * divisor)
+    return [cv2.resize(frame, (W_, H_)) for frame in frames]
+
+def frames_to_torch(frames):
+    return [torch.from_numpy(frame).permute(2,0,1).float()[None] / 255 for frame in frames]
+
+# %%
+def write_video(file_path, frames, fps):
+    h, w, _ = frames[0].shape
+    fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
+    writer = cv2.VideoWriter(file_path, fourcc, fps, (w, h))
+
+    for frame in frames:
+        writer.write(frame)
+
+    writer.release()
+
+# %%
