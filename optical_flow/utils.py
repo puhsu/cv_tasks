@@ -57,7 +57,7 @@ def write_video(file_path, frames, fps=30):
 
 def play_video(file_path, width=400):
     with open(file_path,'rb') as mp4:
-        data_url = "data:video/mp4;base64," + b64encode(mp4).decode()
+        data_url = "data:video/mp4;base64," + b64encode(mp4.read()).decode()
         return HTML(f"""
             <video width={width} controls>
                 <source src="{data_url}" type="video/mp4">
